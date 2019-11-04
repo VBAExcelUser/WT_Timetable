@@ -1,0 +1,151 @@
+Option Explicit
+
+Dim AufNr As Long
+Dim Anz, kw As Byte
+Dim bereich1, bereich2 As String
+Dim iport As Range
+Dim rng As Variant
+Dim i, a As Integer
+Dim zeile As Byte
+Dim nichts As String
+
+
+'Wenn der Nutzer neue Aufträge in die Liste eintragen möchte, stehen die 2 markierten Zeilen
+'über der Lieferliste zur Verfügung. Nach Betätigung des Buttons werden diese in die Liste,
+'sowie in die Historie übernommen und der Bereich wird wieder freigegeben.
+
+Sub AuftragEinladen()
+    
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    
+    zeile = 5 'Standartmäßig wir die erste Zeile befüllt
+    
+    'Fehlerhafte Benutzereingaben
+     If ActiveSheet.Cells(5, 1).Value = "" And ActiveSheet.Cells(6, 1).Value = "" Then 'Keine Auftr.Nr.
+        MsgBox "Keine Auftragsnummer gefunden."
+        Exit Sub
+    End If
+    
+    If Not ActiveSheet.Cells(5, 1).Value = "" And Not ActiveSheet.Cells(6, 1).Value = "" Then 'Anzahl der neuen Aufträge
+        Anz = 2 'Beide Zeilen befüllt
+    Else
+        Anz = 1
+    End If
+    
+    If Anz = 1 Then 'In welcher Ziele steht der neue Antrag, wenn nur einer ermittelt wurde
+        If ActiveSheet.Cells(5, 1).Value = "" Then 'Obere Zeile leer
+            zeile = 4
+        End If
+    End If
+        
+    Set iport = ActiveSheet.Range("A7:AL7") 'Zeile für Bennenung der Informationen
+    
+    kw = ActiveSheet.Cells(zeile, iport.Find("KW").Column).Value 'KW merken
+    
+    For i = 8 To 1000 Step 1
+        If ActiveSheet.Cells(i, iport.Find("Jahr").Column).Value = "" Then 'Kein Jahr -> Leere Zeile
+            'Überschreiben
+            If Anz = 2 Then 'Beide Zeilen übertragen
+                bereich1 = "A5:Al6"
+                bereich2 = "A" & i & ":Al" & (i + 1)
+            Else 'Eine Zeile übertragen
+                bereich1 = "A" & zeile & ":AI" & zeile
+                bereich2 = "A" & i & ":Al" & i
+            End If
+            
+            'Aufträge an das Ende der Liste setzen
+            Range(bereich1).Copy
+            Range(bereich2).PasteSpecial xlPasteValues
+            
+            'Auftrag in Historie übernehmen
+            For a = 5 To 1000 Step 1
+                If Worksheets("Historie").Cells(a, 1).Value = "" Then 'Keine Auftr.Art -> Leere Zeile
+                    If Anz = 1 Then 'Eine Zeile übertragen
+                        bereich2 = "F" & a & ":AN" & a
+                        Worksheets("Historie").Cells(a, 1).Value = "Neuer Auftrag"
+                        Worksheets("Historie").Cells(a, 2).Value = Format(Now, "DD.MM.YY HH.MM")
+                    Else 'Beide Zeilen übertragen
+                        bereich2 = "F" & a & ":AN" & (a + 1)
+                        Worksheets("Historie").Cells(a, 1).Value = "Neuer Auftrag"
+                        Worksheets("Historie").Cells(a + 1, 1).Value = "Neuer Auftrag"
+                        Worksheets("Historie").Cells(a, 2).Value = Format(Now, "DD.MM.YY HH.MM")
+                        Worksheets("Historie").Cells(a + 1, 2).Value = Format(Now, "DD.MM.YY HH.MM")
+                    End If
+                    
+                    Range(bereich1).Copy
+                    Worksheets("Historie").Select
+                    Range(bereich2).PasteSpecial xlPasteValues
+                    Worksheets("Gesamt").Select
+                    
+                    Exit For
+                End If
+            Next
+            
+            'ANPASSEN SVERWEIS UND FORMELN********************************************************
+            'Zeilen wieder freigeben
+            Range("A3:D4").ClearContents
+            Range("F3:L4").ClearContents
+            Range("N3:O4").ClearContents    'Anzahl Verschiebungen
+            Range("Q3:AC4").ClearContents
+            Range("AE3:AI4").ClearContents
+            
+            Call Sortieren.Zusammenführen 'Einsortieren
+            
+            Exit For
+        End If
+        
+    Next
+    
+    nichts = MsgBox("Die Aufträge wurden erfolgreich eingetragen.", vbInformation)
+    
+    Set rng = ActiveWorkbook.Worksheets("Timetable").Range("i6:i1000").Find(kw)
+    ActiveWindow.ScrollRow = rng.row
+    
+End Sub
+
+'Nachdem eine Zelle der Zeile des gewünschten Auftrags markiert wurde, werden nach Betätigung des "Verschieben" Buttons
+'die Auftragsdetails in das UserForm "Verschieben" geladen. Anschließend kann eine neue KW und ein Grund angegeben werden.
+'Nach der Bestätigung wird die KW des Auftrags geändert und die Verschiebung in die Historie übernommen.
+'Kapazitäten werden NICHT berücksichtigt!
+
+Sub AuftragVerschieben()
+    
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    
+    Set iport = ActiveSheet.Range("A7:AL7") 'Zeile für Bennenung der Informationen
+    
+    'Feherhafte Eingabe
+'    If IsNumeric(ActiveCell.Value) = False Or (ActiveCell.Column <> iport.Find("Auftr._Nr").Column) Then
+'
+'        MsgBox "Keine Auftragsnummer gewählt."
+'        Exit Sub
+'
+'    End If
+    
+    With Verschieben
+        
+        'Hintergrundfarbe festlegen
+        .BackColor = RGB(191, 228, 255)
+        
+        'Standartwerte
+        .AufNr_in.Value = CLng(ActiveSheet.Cells(ActiveCell.row, iport.Find("Auftr.-Nr").Column))
+        .KW_in.Value = ActiveSheet.Cells(ActiveCell.row, iport.Find("KW").Column).Value
+        .Name_in.Value = ActiveSheet.Cells(ActiveCell.row, iport.Find("Name").Column).Value
+        .PLZ_in.Value = ActiveSheet.Cells(ActiveCell.row, iport.Find("PLZ").Column).Value
+        .MKO_in.Value = ActiveSheet.Cells(ActiveCell.row, iport.Find("MKO").Column).Value
+        
+        'Listboxen initialisieren
+        .Grund_in.RowSource = "data_algo_vba!o3:o7"
+        
+        'Position des UserForms zentrieren
+        .StartUpPosition = 0
+        .Left = Application.Left + (0.5 * Application.Width) - (0.5 * .Width)
+        .Top = Application.Top + (0.5 * Application.Height) - (0.5 * .Height)
+    
+        .Show
+    
+    End With
+    
+End Sub
